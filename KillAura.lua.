@@ -1,82 +1,70 @@
+-- Roblox PvP Sword Fighting Reach Script
+-- Adjustable reach distance for better PvP advantage
+
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
+-- Configuration
+local REACH_DISTANCE = 50 -- Adjust this value to change your reach (default 25)
+local SWORD_NAME = "Sword" -- Change this to match your sword's name
 
-local KILL_AURA_RANGE = 15 -- studs
-local ATTACK_COOLDOWN = 0.5 -- seconds
-local DAMAGE = 25 -- damage per hit
-local AUTO_ATTACK = true
-
-local function getSword()
-    for _, tool in pairs(character:GetChildren()) do
-        if tool:IsA("Tool") and tool:FindFirstChild("Handle") then
+-- Find the sword tool
+local function findSword()
+    for _, tool in ipairs(Character:GetChildren()) do
+        if tool:IsA("Tool") and (string.find(tool.Name:lower(), SWORD_NAME:lower()) or tool:FindFirstChildOfClass("SwordConstraint")) then
             return tool
         end
     end
     return nil
 end
 
-local function findNearestTarget()
-    local nearestPlayer = nil
-    local shortestDistance = KILL_AURA_RANGE
+-- Main function
+local function extendReach()
+    local sword = findSword()
+    if not sword then
+        warn("No sword found in character!")
+        return
+    end
 
-    for _, otherPlayer in pairs(Players:GetPlayers()) do
-        if otherPlayer ~= player and otherPlayer.Character then
-            local otherHumanoid = otherPlayer.Character:FindFirstChild("Humanoid")
-            local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local rootPart = character:FindFirstChild("HumanoidRootPart")
-
-            if otherHumanoid and otherHumanoid.Health > 0 and otherRoot and rootPart then
-                local distance = (otherRoot.Position - rootPart.Position).Magnitude
-                if distance < shortestDistance then
-                    shortestDistance = distance
-                    nearestPlayer = otherPlayer
+    -- Create a remote hit function
+    local remoteHit
+    for _, v in ipairs(getconnections(sword.Activated)) do
+        local script = v.Function and getfenv(v.Function).script
+        if script then
+            for _, child in ipairs(script:GetDescendants()) do
+                if child:IsA("RemoteEvent") and child.Name:lower():find("hit") then
+                    remoteHit = child
+                    break
                 end
             end
         end
     end
 
-    return nearestPlayer
-end
+    if not remoteHit then
+        warn("Could not find hit remote!")
+        return
+    end
 
-local lastAttack = 0
-local function attackTarget(target)
-    local now = tick()
-    if now - lastAttack < ATTACK_COOLDOWN then return end
-    
-    local sword = getSword()
-    if not sword then return end
-    
-    humanoid:LoadAnimation(sword:FindFirstChildOfClass("Animation")):Play()
-    
-    if target.Character then
-        local targetHumanoid = target.Character:FindFirstChild("Humanoid")
-        if targetHumanoid then
-            targetHumanoid:TakeDamage(DAMAGE)
+    -- Original hit function
+    local originalHit = remoteHit.FireServer
+    remoteHit.FireServer = function(self, ...)
+        local args = {...}
+        if #args >= 2 and typeof(args[2]) == "Vector3" then
+            -- Extend the hit position
+            local direction = (args[2] - HumanoidRootPart.Position).Unit
+            args[2] = HumanoidRootPart.Position + (direction * REACH_DISTANCE)
         end
+        return originalHit(self, unpack(args))
     end
-    
-    lastAttack = now
+
+    print("Reach extended successfully! Current reach:", REACH_DISTANCE)
 end
 
--- Main loop
-local function killAuraLoop()
-    if AUTO_ATTACK then
-        local target = findNearestTarget()
-        if target then
-            attackTarget(target)
-        end
-    end
-end
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.F then
-        AUTO_ATTACK = not AUTO_ATTACK
-    end
+-- Run the script
+Character:WaitForChild("Humanoid").Died:Connect(function()
+    warn("Character died - script stopped")
 end)
 
-RunService.Heartbeat:Connect(killAuraLoop)
+extendReach()
