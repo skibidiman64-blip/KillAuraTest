@@ -1,0 +1,90 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+-- Configuration
+local KILL_AURA_RANGE = 15 -- studs
+local ATTACK_COOLDOWN = 0.5 -- seconds
+local DAMAGE = 25 -- damage per hit
+local AUTO_ATTACK = true
+
+-- Sword detection
+local function getSword()
+    for _, tool in pairs(character:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Handle") then
+            return tool
+        end
+    end
+    return nil
+end
+
+-- Target finding
+local function findNearestTarget()
+    local nearestPlayer = nil
+    local shortestDistance = KILL_AURA_RANGE
+
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character then
+            local otherHumanoid = otherPlayer.Character:FindFirstChild("Humanoid")
+            local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+            if otherHumanoid and otherHumanoid.Health > 0 and otherRoot and rootPart then
+                local distance = (otherRoot.Position - rootPart.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    nearestPlayer = otherPlayer
+                end
+            end
+        end
+    end
+
+    return nearestPlayer
+end
+
+-- Attack function
+local lastAttack = 0
+local function attackTarget(target)
+    local now = tick()
+    if now - lastAttack < ATTACK_COOLDOWN then return end
+    
+    local sword = getSword()
+    if not sword then return end
+    
+    -- Simulate sword swing animation
+    humanoid:LoadAnimation(sword:FindFirstChildOfClass("Animation")):Play()
+    
+    -- Damage the target
+    if target.Character then
+        local targetHumanoid = target.Character:FindFirstChild("Humanoid")
+        if targetHumanoid then
+            targetHumanoid:TakeDamage(DAMAGE)
+        end
+    end
+    
+    lastAttack = now
+end
+
+-- Main loop
+local function killAuraLoop()
+    if AUTO_ATTACK then
+        local target = findNearestTarget()
+        if target then
+            attackTarget(target)
+        end
+    end
+end
+
+-- Toggle with keybind (optional)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.F then
+        AUTO_ATTACK = not AUTO_ATTACK
+    end
+end)
+
+-- Start the kill aura
+RunService.Heartbeat:Connect(killAuraLoop)
