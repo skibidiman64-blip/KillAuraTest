@@ -1,70 +1,86 @@
--- Roblox PvP Sword Fighting Reach Script
--- Adjustable reach distance for better PvP advantage
+-- ⚔️ Universal Sword Reach KillAura + Draggable GUI Slider
+-- Omega draggable edition 🔥
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
--- Configuration
-local REACH_DISTANCE = 50 -- Adjust this value to change your reach (default 25)
-local SWORD_NAME = "Sword" -- Change this to match your sword's name
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local Frame = Instance.new("Frame", ScreenGui)
+local SliderBack = Instance.new("Frame", Frame)
+local SliderButton = Instance.new("TextButton", SliderBack)
+local Label = Instance.new("TextLabel", Frame)
 
--- Find the sword tool
-local function findSword()
-    for _, tool in ipairs(Character:GetChildren()) do
-        if tool:IsA("Tool") and (string.find(tool.Name:lower(), SWORD_NAME:lower()) or tool:FindFirstChildOfClass("SwordConstraint")) then
-            return tool
-        end
+ScreenGui.ResetOnSpawn = false
+
+Frame.Size = UDim2.new(0, 250, 0, 100)
+Frame.Position = UDim2.new(0.5, -125, 0.8, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Frame.Active = true
+Frame.Draggable = true -- 🔥 makes the frame movable
+
+Label.Size = UDim2.new(1, 0, 0.3, 0)
+Label.Position = UDim2.new(0, 0, 0, 0)
+Label.BackgroundTransparency = 1
+Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+Label.TextScaled = true
+Label.Text = "Reach: 20"
+
+SliderBack.Size = UDim2.new(0.9, 0, 0.3, 0)
+SliderBack.Position = UDim2.new(0.05, 0, 0.5, 0)
+SliderBack.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+
+SliderButton.Size = UDim2.new(0, 20, 1, 0)
+SliderButton.Position = UDim2.new(0, 0, 0, 0)
+SliderButton.BackgroundColor3 = Color3.fromRGB(150, 150, 255)
+SliderButton.Text = ""
+
+local UIS = game:GetService("UserInputService")
+local dragging = false
+local reachDistance = 20
+local Tool = nil
+
+-- Detect sword
+LocalPlayer.Character.ChildAdded:Connect(function(child)
+    if child:IsA("Tool") then
+        Tool = child
     end
-    return nil
-end
+end)
 
--- Main function
-local function extendReach()
-    local sword = findSword()
-    if not sword then
-        warn("No sword found in character!")
-        return
+-- Drag slider
+SliderButton.MouseButton1Down:Connect(function()
+    dragging = true
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
     end
+end)
 
-    -- Create a remote hit function
-    local remoteHit
-    for _, v in ipairs(getconnections(sword.Activated)) do
-        local script = v.Function and getfenv(v.Function).script
-        if script then
-            for _, child in ipairs(script:GetDescendants()) do
-                if child:IsA("RemoteEvent") and child.Name:lower():find("hit") then
-                    remoteHit = child
-                    break
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local relX = math.clamp((input.Position.X - SliderBack.AbsolutePosition.X) / SliderBack.AbsoluteSize.X, 0, 1)
+        SliderButton.Position = UDim2.new(relX, -10, 0, 0)
+        reachDistance = math.floor(10 + relX * 40) -- 10–50 studs
+        Label.Text = "Reach: " .. tostring(reachDistance)
+    end
+end)
+
+-- KillAura loop
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if Tool and Tool.Parent == Character then
+            for _,plr in pairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local mag = (plr.Character.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
+                    if mag <= reachDistance then
+                        firetouchinterest(plr.Character.HumanoidRootPart, Tool.Handle, 0)
+                        task.wait()
+                        firetouchinterest(plr.Character.HumanoidRootPart, Tool.Handle, 1)
+                    end
                 end
             end
         end
     end
-
-    if not remoteHit then
-        warn("Could not find hit remote!")
-        return
-    end
-
-    -- Original hit function
-    local originalHit = remoteHit.FireServer
-    remoteHit.FireServer = function(self, ...)
-        local args = {...}
-        if #args >= 2 and typeof(args[2]) == "Vector3" then
-            -- Extend the hit position
-            local direction = (args[2] - HumanoidRootPart.Position).Unit
-            args[2] = HumanoidRootPart.Position + (direction * REACH_DISTANCE)
-        end
-        return originalHit(self, unpack(args))
-    end
-
-    print("Reach extended successfully! Current reach:", REACH_DISTANCE)
-end
-
--- Run the script
-Character:WaitForChild("Humanoid").Died:Connect(function()
-    warn("Character died - script stopped")
 end)
-
-extendReach()
