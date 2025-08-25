@@ -1,5 +1,4 @@
--- ⚔️ Universal Sword Reach KillAura + Draggable GUI Slider
--- Omega draggable edition 🔥
+-- Universal Sword Reach KillAura + Draggable GUI Slider
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -17,7 +16,7 @@ Frame.Size = UDim2.new(0, 250, 0, 100)
 Frame.Position = UDim2.new(0.5, -125, 0.8, 0)
 Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 Frame.Active = true
-Frame.Draggable = true -- 🔥 makes the frame movable
+Frame.Draggable = true
 
 Label.Size = UDim2.new(1, 0, 0.3, 0)
 Label.Position = UDim2.new(0, 0, 0, 0)
@@ -40,14 +39,12 @@ local dragging = false
 local reachDistance = 20
 local Tool = nil
 
--- Detect sword
 LocalPlayer.Character.ChildAdded:Connect(function(child)
     if child:IsA("Tool") then
         Tool = child
     end
 end)
 
--- Drag slider
 SliderButton.MouseButton1Down:Connect(function()
     dragging = true
 end)
@@ -66,7 +63,6 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
--- KillAura loop
 task.spawn(function()
     while true do
         task.wait(0.1)
